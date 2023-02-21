@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Rethinking the Role of Demonstrations: What Makes In-Context Learning Work?
 
 This includes an original implementation of "[Rethinking the Role of Demonstrations: What Makes In-Context Learning Work?][paper]" by [Sewon Min][sewon], [Xinxi Lyu][xinxi], [Ari Holtzman][ari], [Mikel Artetxe][mikel], [Mike Lewis][mike], [Hannaneh Hajishirzi][hanna], and [Luke Zettlemoyer][luke].
@@ -570,5 +569,3 @@ MetaICL is CC-BY-NC 4.0 licensed.
 [crossfit-repo]: https://github.com/INK-USC/CrossFit
 [t0-paper]: https://arxiv.org/abs/2110.08207
 [t0-repo]: https://github.com/bigscience-workshop/promptsource
-
->>>>>>> ec0f1c199965f54d4b4d35556e5ca9ba0a6719ab
