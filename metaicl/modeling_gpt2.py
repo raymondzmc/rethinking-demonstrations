@@ -177,29 +177,30 @@ class GPT2Attention(nn.Module):
         self.pruned_heads = self.pruned_heads.union(heads)
 
     def _attn(self, query, key, value, attention_mask=None, head_mask=None, tmp_score=None):
-        attn_weights = torch.matmul(query, key.transpose(-1, -2))
+        if tmp_score is None:
+            attn_weights = torch.matmul(query, key.transpose(-1, -2))
 
-        if self.scale_attn_weights:
-            attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
+            if self.scale_attn_weights:
+                attn_weights = attn_weights / (float(value.size(-1)) ** 0.5)
 
-        if not self.is_cross_attention:
-            # if only "normal" attention layer implements causal mask
-            query_length, key_length = query.size(-2), key.size(-2)
-            causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length].bool()
-            attn_weights = torch.where(causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype))
+            if not self.is_cross_attention:
+                # if only "normal" attention layer implements causal mask
+                query_length, key_length = query.size(-2), key.size(-2)
+                causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length].bool()
+                attn_weights = torch.where(causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype))
 
-        if attention_mask is not None:
-            # Apply the attention mask
-            attn_weights = attn_weights + attention_mask
+            if attention_mask is not None:
+                # Apply the attention mask
+                attn_weights = attn_weights + attention_mask
 
-        attn_weights = nn.Softmax(dim=-1)(attn_weights)
-        attn_weights = self.attn_dropout(attn_weights)
+            attn_weights = nn.Softmax(dim=-1)(attn_weights)
+            attn_weights = self.attn_dropout(attn_weights)
 
-        # Mask heads if we want to
-        if head_mask is not None:
-            attn_weights = attn_weights * head_mask
+            # Mask heads if we want to
+            if head_mask is not None:
+                attn_weights = attn_weights * head_mask
 
-        if tmp_score is not None:
+        else:
             attn_weights = tmp_score
 
         attn_output = torch.matmul(attn_weights, value)
@@ -802,6 +803,20 @@ class GPT2Model(GPT2PreTrainedModel):
                     encoder_attention_mask,
                 )
             else:
+                # if tar_layer and tar_layer < i:
+                #     with torch.no_grad():
+                #         outputs = block(
+                #             hidden_states,
+                #             layer_past=layer_past,
+                #             attention_mask=attention_mask,
+                #             head_mask=head_mask[i],
+                #             encoder_hidden_states=encoder_hidden_states,
+                #             encoder_attention_mask=encoder_attention_mask,
+                #             use_cache=use_cache,
+                #             output_attentions=output_attentions,
+                #             tmp_score=_tmp_score,
+                #         )
+                # else:
                 if tar_layer == i:
                     _tmp_score = tmp_score
                 else:
@@ -997,11 +1012,12 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             tar_prob = prob[:, :, shift_labels[0]]
             #gradient = torch.autograd.grad(torch.unbind(prob[:, labels[0]]), tmp_score)
             pred_prob = torch.index_select(prob, -1, pred_label.squeeze(0).long())
-            try:
-                gradient = torch.autograd.grad(pred_prob.sum(), tmp_score, allow_unused=True)
-            except:
-                pdb.set_trace()
-            return tar_prob, gradient[0]
+            gradient = torch.autograd.grad(pred_prob.sum(), tmp_score, allow_unused=True)
+            # try:
+            #     gradient = torch.autograd.grad(pred_prob.sum(), tmp_score, allow_unused=True)
+            # except:
+            #     pdb.set_trace()
+            return gradient[0]
 
         loss = None
         if labels is not None:

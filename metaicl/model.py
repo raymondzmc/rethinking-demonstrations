@@ -8,6 +8,7 @@ import numpy as np
 import os
 import torch
 import torch.nn.functional as F
+import gc
 import pdb
 
 from tqdm import tqdm
@@ -278,6 +279,8 @@ class MetaICLModel(object):
         return predictions
 
     def do_interpret(self, data, batch_size=1, verbose=False, zero_baseline=False):
+        data.tensorized_inputs = {k: v[:500] for k, v in data.tensorized_inputs.items()}
+        torch.save(data.tensorized_inputs, os.path.join(self.out_dir, 'tensorized_inputs.pt'))
         dataloader = data.get_dataloader(batch_size, is_training=False)
         hidden_states = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_embd), dtype=torch.float16)
         input_attributions = torch.empty(len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_positions, dtype=torch.float16)
@@ -285,9 +288,12 @@ class MetaICLModel(object):
         idx = 0
         if verbose:
             dataloader = tqdm(dataloader)
-        losses = []
+        all_losses = []
+
+        save_data = []
         for batch in dataloader:
             input_ids=batch[0].to(self.device)
+            # print(input_ids.shape[1])
             attention_mask=batch[1].to(self.device)
             token_type_ids=batch[2].to(self.device)
             if len(batch)==3:
@@ -297,15 +303,12 @@ class MetaICLModel(object):
 
             # with torch.no_grad():
             # outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=input_ids, output_attentions=True, output_hidden_states=True)
-            # hidden_states[idx] = outputs.hidden_states[-1].squeeze(0)
             outputs, input_attr, head_attr = self.get_attrscore(input_ids, attention_mask, zero_baseline)
             input_attributions[idx] = input_attr
             head_attributions[idx] = head_attr
             hidden_states[idx] = outputs.hidden_states[-1].squeeze(0)
 
             logits = outputs.logits[..., :-1, :].contiguous()
-            
-            pdb.set_trace()
             if labels is None:
                 labels = input_ids
             labels = labels[..., 1:].contiguous()
@@ -315,38 +318,40 @@ class MetaICLModel(object):
             losses = loss_fct(logits.view(-1, logits.size(-1)), labels.view(-1)) # [batch_size, length]
             
             losses = losses.view(logits.size(0), logits.size(1)) * label_mask
-            loss = torch.sum(losses, axis=1) / torch.sum(label_mask, axis=1)
+            losses = torch.sum(losses, axis=1) / torch.sum(label_mask, axis=1)
             
-            losses += loss.cpu().detach().numpy().tolist()
+            all_losses += losses.cpu().detach().numpy().tolist()
             idx += 1
+
+            gc.collect()
+            torch.cuda.empty_cache()
         
-        torch.save(input_attributions, 'input_attributions.pt')
-        torch.save(head_attributions, 'head_attributions.pt')
-        torch.save(hidden_states, 'hidden_states.pt')
-        return losses
+        torch.save(input_attributions, os.path.join(self.out_dir, 'input_attributions.pt'))
+        torch.save(head_attributions.mean(0), os.path.join(self.out_dir, 'head_attributions.pt'))
+        torch.save(hidden_states, os.path.join(self.out_dir, 'hidden_states.pt'))
+        return all_losses
 
     def get_attrscore(self, input_ids, attention_mask, zero_baseline):
         base_tokens = ["[UNK]"]*len(input_ids)
         batch_size = input_ids.shape[0]
         num_batch = 4
 
-        outputs = self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            labels=input_ids,
-            output_attentions=True,
-            output_hidden_states=True,
-        )
+        with torch.no_grad():
+            outputs = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=input_ids,
+                output_attentions=True,
+                output_hidden_states=True,
+            )
         logits = outputs.logits[..., :-1, :].contiguous()
-        pred_label = torch.argmax(logits, dim=-1).int()
-        att_all = [a[0].data for a in outputs.attentions]
+        pred_label = torch.argmax(logits, dim=-1).int().detach()
+        att_all = [a[0].detach().cpu() for a in outputs.attentions]
 
         input_attributions = torch.zeros(self.model.config.n_positions, self.model.config.n_positions)
         head_attributions = torch.zeros(self.model.config.n_layer, self.model.config.n_head)
 
         for tar_layer in range(self.model.config.n_layer):
-            print(tar_layer)
-    
             if zero_baseline:
                 baseline = None
             else:
@@ -354,16 +359,18 @@ class MetaICLModel(object):
                 # baseline = self.model(input_ids, segment_ids, input_mask, label_ids, -tar_layer-1)[0]
                 # baseline = baseline.data
             
-            scale_att, step = scaled_input(att_all[tar_layer].detach(), batch_size, num_batch, baseline)
+            scale_att, step = scaled_input(att_all[tar_layer], batch_size, num_batch, baseline)
+            scale_att = scale_att.to(self.device)
             scale_att.requires_grad = True
 
             attr_all = None
             for j_batch in range(num_batch):
                 one_batch_att = scale_att[j_batch*batch_size:(j_batch+1)*batch_size]
-                tar_prob, grad = self.model(
+                grad = self.model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                     labels=input_ids,
+                    use_cache=False,
                     tar_layer=tar_layer,
                     tmp_score=one_batch_att,
                     pred_label=pred_label,
@@ -371,10 +378,15 @@ class MetaICLModel(object):
                 grad = grad.sum(dim=0) 
                 attr_all = grad if attr_all is None else torch.add(attr_all, grad)
             
-            head_attributions[tar_layer] += attr_all.sum(2).sum(1)
-            input_attributions += attr_all.sum(0)
-        pdb.set_trace()
-        
+            head_attributions[tar_layer] += attr_all.sum(2).sum(1).detach().cpu()
+            input_attributions += attr_all.sum(0).detach().cpu()
+
+            del grad, attr_all, scale_att
+            # print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
+            # print("torch.cuda.memory_reserved: %fGB"%(torch.cuda.memory_reserved(0)/1024/1024/1024))
+            # print("torch.cuda.max_memory_reserved: %fGB"%(torch.cuda.max_memory_reserved(0)/1024/1024/1024))
+            gc.collect()
+            torch.cuda.empty_cache()
         
         return outputs, input_attributions, head_attributions
 
