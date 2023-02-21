@@ -54,7 +54,7 @@ def main(args):
     seeds = args.seed.split(',')
     perfs = []
     for dataset_idx, (dataset, new_dataset) in enumerate(zip(datasets, new_datasets)):
-
+        # import pdb; pdb.set_trace()
         # contruct and save a new config file and data directory
         config_file = os.path.join(args.config_dir, "tasks")
         assert os.path.exists(config_file), config_file
@@ -63,7 +63,7 @@ def main(args):
 
         # in case of random English words, we will create a config file and data directory
         # for each random seed later on (since the data is different across seeds)
-        if args.variant in ["random_english_words", "random_english_words_gold_labels"]:
+        if args.variant in ["random_english_words", "random_english_words_gold_labels", 'random']:
             with open(os.path.join(config_file, "{}.json".format(new_dataset)), "w") as f:
                 json.dump(config, f)
 
