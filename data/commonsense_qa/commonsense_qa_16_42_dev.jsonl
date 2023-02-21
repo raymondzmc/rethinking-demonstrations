@@ -1,0 +1,16 @@
+{"task": "commonsense_qa", "input": "Many prison movies take place at what famous prison?", "output": "alcatraz", "options": ["forest", "city", "countryside", "america", "alcatraz"]}
+{"task": "commonsense_qa", "input": "The lizard lived at the base of the ancient longest wall, what country did it likely live in?", "output": "china", "options": ["forrest", "desert", "tropics", "china", "garden"]}
+{"task": "commonsense_qa", "input": "Where might someone go to watch a flute?", "output": "symphony", "options": ["park", "symphony", "orchestra", "music shop", "musical instrument store"]}
+{"task": "commonsense_qa", "input": "Family is always the best for devotion, but it is also nice if a person has what?", "output": "loyal friends", "options": ["good review", "headache", "with cat", "loyal friends", "shoes"]}
+{"task": "commonsense_qa", "input": "Where would you put a marker if you plan to use it soon at the same location?", "output": "desk", "options": ["child's backpack", "desk", "pocket", "office supply store", "briefcase"]}
+{"task": "commonsense_qa", "input": "He kept a container can for draining oil in what location of the house?", "output": "garage", "options": ["liquid", "store", "garage", "pantry", "gutter"]}
+{"task": "commonsense_qa", "input": "What do humans have that cerberus does not have?", "output": "one head", "options": ["one head", "two ears", "lay eggs", "3 legs", "two feet"]}
+{"task": "commonsense_qa", "input": "Danny was studying statistics in class, and he something disturbing about driving.   It causes a significant number of what?", "output": "deaths", "options": ["deaths", "moving", "car wrecks", "using gas", "may die"]}
+{"task": "commonsense_qa", "input": "The video game featured an anger bar that you charged up to more easily do what?", "output": "destroy enemy", "options": ["illustrate point", "destroy enemy", "cool off", "write letter", "get drunk"]}
+{"task": "commonsense_qa", "input": "Where would you use a changing room before gym?", "output": "schools", "options": ["gym", "clothing store", "change baby's diaper", "department store", "schools"]}
+{"task": "commonsense_qa", "input": "The bird took flight by moving its what?", "output": "two wings", "options": ["two legs", "feathers", "entertain yourself", "head", "two wings"]}
+{"task": "commonsense_qa", "input": "A human wants to go shopping in a dense urban area.  Where might be a good place for a person to go shopping?", "output": "downtown", "options": ["detroit", "elevator", "workplace", "downtown", "mall"]}
+{"task": "commonsense_qa", "input": "It could have been a beautiful day, but what did the overcast sky do to the color?", "output": "dull", "options": ["bee utiful", "ugly", "dull", "plain", "wet"]}
+{"task": "commonsense_qa", "input": "Where will any tearoom be?", "output": "building", "options": ["building", "london", "england", "boston ship harbor", "restaurant"]}
+{"task": "commonsense_qa", "input": "If you are deep in a cave, what would you follow to find your way out?", "output": "light", "options": ["deepfelt", "light", "high", "frivolous", "mountain"]}
+{"task": "commonsense_qa", "input": "When playing baseball they keep track of mistakes, this stat is called what?", "output": "errors", "options": ["happiness", "sore muscles", "injury", "perfection", "errors"]}
