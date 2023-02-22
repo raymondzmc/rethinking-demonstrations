@@ -283,8 +283,10 @@ class MetaICLModel(object):
         torch.save(data.tensorized_inputs, os.path.join(self.out_dir, 'tensorized_inputs.pt'))
         dataloader = data.get_dataloader(batch_size, is_training=False)
         hidden_states = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_embd), dtype=torch.float16)
-        input_attributions = torch.empty(len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_positions, dtype=torch.float16)
-        head_attributions = torch.empty(len(dataloader.dataset), self.model.config.n_layer, self.model.config.n_head, dtype=torch.float16)
+        input_attributions = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_positions), dtype=torch.float16)
+        head_attributions = torch.empty((len(dataloader.dataset), self.model.config.n_layer, self.model.config.n_head), dtype=torch.float32)
+        attentions = torch.zeros((self.model.config.n_layer, self.model.config.n_head, self.model.config.n_positions, self.model.config.n_positions), dtype=torch.float32)
+        attentions_count = torch.zeros(self.model.config.n_positions, self.model.config.n_positions)
         idx = 0
         if verbose:
             dataloader = tqdm(dataloader)
@@ -293,20 +295,24 @@ class MetaICLModel(object):
         save_data = []
         for batch in dataloader:
             input_ids=batch[0].to(self.device)
-            # print(input_ids.shape[1])
+            
             attention_mask=batch[1].to(self.device)
             token_type_ids=batch[2].to(self.device)
             if len(batch)==3:
                 labels=None
             else:
                 labels=batch[3].to(self.device)
+            
+            input_len = attention_mask.sum().item()
+            attentions_count[:input_len, :input_len] += 1
 
             # with torch.no_grad():
             # outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=input_ids, output_attentions=True, output_hidden_states=True)
-            outputs, input_attr, head_attr = self.get_attrscore(input_ids, attention_mask, zero_baseline)
+            outputs, input_attr, head_attr, attn = self.get_attrscore(input_ids, attention_mask, zero_baseline)
             input_attributions[idx] = input_attr
             head_attributions[idx] = head_attr
             hidden_states[idx] = outputs.hidden_states[-1].squeeze(0)
+            attentions += attn
 
             logits = outputs.logits[..., :-1, :].contiguous()
             if labels is None:
@@ -325,9 +331,11 @@ class MetaICLModel(object):
 
             gc.collect()
             torch.cuda.empty_cache()
-        
+
+        attentions /= attentions_count.unsqueeze(0).unsqueeze(0)
+        torch.save(attentions, os.path.join(self.out_dir, 'aggregate_attentions.pt'))
         torch.save(input_attributions, os.path.join(self.out_dir, 'input_attributions.pt'))
-        torch.save(head_attributions.mean(0), os.path.join(self.out_dir, 'head_attributions.pt'))
+        torch.save(head_attributions, os.path.join(self.out_dir, 'head_attributions.pt'))
         torch.save(hidden_states, os.path.join(self.out_dir, 'hidden_states.pt'))
         return all_losses
 
@@ -388,7 +396,8 @@ class MetaICLModel(object):
             gc.collect()
             torch.cuda.empty_cache()
         
-        return outputs, input_attributions, head_attributions
+        
+        return outputs, input_attributions, head_attributions, torch.stack(att_all)
 
 
     def run_model(self, input_ids, attention_mask, token_type_ids, labels=None):
