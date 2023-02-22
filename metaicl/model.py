@@ -294,10 +294,15 @@ class MetaICLModel(object):
 
         save_data = []
         for batch in dataloader:
+
             input_ids=batch[0].to(self.device)
-            
             attention_mask=batch[1].to(self.device)
             token_type_ids=batch[2].to(self.device)
+
+            input_len = attention_mask.sum().item()
+            input_ids = input_ids[:, :input_len]
+            attention_mask = attention_mask[:, :input_len]
+            token_type_ids = token_type_ids[:, :input_len]
             if len(batch)==3:
                 labels=None
             else:
@@ -309,10 +314,10 @@ class MetaICLModel(object):
             # with torch.no_grad():
             # outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=input_ids, output_attentions=True, output_hidden_states=True)
             outputs, input_attr, head_attr, attn = self.get_attrscore(input_ids, attention_mask, zero_baseline)
-            input_attributions[idx] = input_attr
+            input_attributions[idx, :input_len, :input_len] = input_attr
             head_attributions[idx] = head_attr
             hidden_states[idx] = outputs.hidden_states[-1].squeeze(0)
-            attentions += attn
+            attentions[:, :, :input_len, :input_len] += attn
 
             logits = outputs.logits[..., :-1, :].contiguous()
             if labels is None:
