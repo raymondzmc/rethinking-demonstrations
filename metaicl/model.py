@@ -282,8 +282,8 @@ class MetaICLModel(object):
         data.tensorized_inputs = {k: v[:500] for k, v in data.tensorized_inputs.items()}
         torch.save(data.tensorized_inputs, os.path.join(self.out_dir, 'tensorized_inputs.pt'))
         dataloader = data.get_dataloader(batch_size, is_training=False)
-        hidden_states = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_embd), dtype=torch.float16)
-        input_attributions = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_positions), dtype=torch.float16)
+        hidden_states = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_embd), dtype=torch.float32)
+        input_attributions = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_positions), dtype=torch.float32)
         head_attributions = torch.empty((len(dataloader.dataset), self.model.config.n_layer, self.model.config.n_head), dtype=torch.float32)
         attentions = torch.zeros((self.model.config.n_layer, self.model.config.n_head, self.model.config.n_positions, self.model.config.n_positions), dtype=torch.float32)
         attentions_count = torch.zeros(self.model.config.n_positions, self.model.config.n_positions)
