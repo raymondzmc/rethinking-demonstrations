@@ -279,7 +279,7 @@ class MetaICLModel(object):
         return predictions
 
     def do_interpret(self, data, batch_size=1, verbose=False, zero_baseline=False):
-        data.tensorized_inputs = {k: v[:500] for k, v in data.tensorized_inputs.items()}
+        # data.tensorized_inputs = {k: v[:500] for k, v in data.tensorized_inputs.items()}
         torch.save(data.tensorized_inputs, os.path.join(self.out_dir, 'tensorized_inputs.pt'))
         dataloader = data.get_dataloader(batch_size, is_training=False)
         hidden_states = torch.empty((len(dataloader.dataset), self.model.config.n_positions, self.model.config.n_embd), dtype=torch.float32)
