@@ -186,6 +186,8 @@ def run(logger, task, metaicl_data, metaicl_model, train_data, dev_data, seed,
     if args.use_calibration:
         prediction_path = prediction_path.replace(".txt", "-calibrated.txt")
 
+    groundtruths = [dp["output"] for dp in dev_data]
+
     if os.path.exists(prediction_path):
         return 0
 

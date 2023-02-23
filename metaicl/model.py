@@ -348,6 +348,7 @@ class MetaICLModel(object):
         base_tokens = ["[UNK]"]*len(input_ids)
         batch_size = input_ids.shape[0]
         num_batch = 4
+        input_len = attention_mask.sum().item()
 
         with torch.no_grad():
             outputs = self.model(
@@ -361,7 +362,7 @@ class MetaICLModel(object):
         pred_label = torch.argmax(logits, dim=-1).int().detach()
         att_all = [a[0].detach().cpu() for a in outputs.attentions]
 
-        input_attributions = torch.zeros(self.model.config.n_positions, self.model.config.n_positions)
+        input_attributions = torch.zeros(input_len, input_len)
         head_attributions = torch.zeros(self.model.config.n_layer, self.model.config.n_head)
 
         for tar_layer in range(self.model.config.n_layer):
